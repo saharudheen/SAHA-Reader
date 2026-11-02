@@ -54,6 +54,9 @@
         </activity>
 
         <activity
+            android:name=".FolderActivity"
+            android:exported="false" />
+        <activity
             android:name=".PdfActivity"
             android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
             android:exported="false" />
