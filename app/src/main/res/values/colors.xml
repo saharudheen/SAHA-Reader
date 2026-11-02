@@ -1,0 +1,12 @@
+<resources>
+    <color name="primary">#1F3A5F</color>
+    <color name="primary_dark">#152A45</color>
+    <color name="accent">#F2994A</color>
+    <color name="bg">#F4F6F9</color>
+    <color name="ic_bg">#1F3A5F</color>
+    <color name="pdf">#E53935</color>
+    <color name="word">#1E5BB8</color>
+    <color name="excel">#1D7A45</color>
+    <color name="text">#546E7A</color>
+    <color name="image">#8E24AA</color>
+</resources>
