@@ -36,15 +36,48 @@
                 android:textColor="#CFE0F5"
                 android:textSize="14sp" />
 
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnOpen"
-                android:layout_width="wrap_content"
+            <LinearLayout
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Browse files"
-                android:textColor="#FFFFFF"
-                app:backgroundTint="@color/accent"
-                app:cornerRadius="12dp" />
+                android:orientation="horizontal">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnOpen"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:text="Browse files"
+                    android:textColor="#FFFFFF"
+                    app:backgroundTint="@color/accent"
+                    app:cornerRadius="12dp" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnFolder"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:text="Open folder"
+                    android:textColor="#FFFFFF"
+                    app:cornerRadius="12dp"
+                    app:strokeColor="#FFFFFF" />
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/btnLastFolder"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="?attr/selectableItemBackground"
+                android:ellipsize="middle"
+                android:maxLines="1"
+                android:paddingVertical="6dp"
+                android:textColor="#FFD7B0"
+                android:textSize="14sp"
+                android:visibility="gone" />
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>
 
@@ -141,7 +174,7 @@
             android:layout_height="match_parent"
             android:gravity="center"
             android:padding="24dp"
-            android:text="Files you open will appear here.\nTip: long-press a file to remove it."
+            android:text="Files you open will appear here.\nTip: use Open folder to swipe through all files in a folder."
             android:textColor="#6B7280" />
     </FrameLayout>
 </LinearLayout>

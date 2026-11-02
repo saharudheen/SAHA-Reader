@@ -4,7 +4,7 @@
     android:layout_height="match_parent"
     android:background="#DADDE2">
 
-    <androidx.recyclerview.widget.RecyclerView
+    <com.saha.reader.ZoomRecyclerView
         android:id="@+id/pdfList"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
