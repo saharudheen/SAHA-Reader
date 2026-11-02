@@ -49,7 +49,7 @@ object XlsxParser {
         val script = """
 function show(i){var s=document.querySelectorAll('.sheet'),t=document.querySelectorAll('.t');
 for(var j=0;j<s.length;j++){s[j].classList.toggle('on',j==i);t[j].classList.toggle('on',j==i);}}"""
-        return HtmlKit.page("<div class='tabs'>$tabs</div>$body", "grid", script)
+        return HtmlKit.page("<div class='tabs'>$tabs</div>$body", "grid tabbed", script)
     }
 
     private class SheetData(val rows: List<HtmlKit.Row>, val maxCols: Int, val truncated: Boolean)

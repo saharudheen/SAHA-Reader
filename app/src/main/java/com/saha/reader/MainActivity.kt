@@ -4,6 +4,8 @@ import android.content.Intent
 import android.content.res.ColorStateList
 import android.net.Uri
 import android.os.Bundle
+import android.provider.DocumentsContract
+import android.provider.OpenableColumns
 import android.text.format.DateUtils
 import android.view.Menu
 import android.view.MenuItem
@@ -32,12 +34,58 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree: Uri? ->
+        if (tree != null) {
+            try {
+                contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            } catch (_: Exception) {
+            }
+            val name = folderName(tree)
+            getSharedPreferences("saha_reader", MODE_PRIVATE).edit()
+                .putString("last_tree", tree.toString()).putString("last_tree_name", name).apply()
+            openFolder(tree, name)
+        }
+    }
+
+    private fun openFolder(tree: Uri, name: String) {
+        startActivity(
+            Intent(this, FolderActivity::class.java)
+                .putExtra(FolderActivity.EXTRA_TREE, tree.toString())
+                .putExtra(FolderActivity.EXTRA_TITLE, name)
+        )
+    }
+
+    private fun folderName(tree: Uri): String = try {
+        val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
+        contentResolver.query(doc, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst()) c.getString(0) else null
+        } ?: "Folder"
+    } catch (_: Exception) {
+        "Folder"
+    }
+
+    private fun refreshLastFolder() {
+        val btn = findViewById<TextView>(R.id.btnLastFolder)
+        val prefs = getSharedPreferences("saha_reader", MODE_PRIVATE)
+        val tree = prefs.getString("last_tree", null)?.let { Uri.parse(it) }
+        val stillAllowed = tree != null && contentResolver.persistedUriPermissions.any { it.uri == tree && it.isReadPermission }
+        if (tree == null || !stillAllowed) {
+            btn.visibility = View.GONE
+            return
+        }
+        val name = prefs.getString("last_tree_name", null) ?: "Folder"
+        btn.text = "Continue in “$name” folder  →"
+        btn.visibility = View.VISIBLE
+        btn.setOnClickListener { openFolder(tree, name) }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         emptyText = findViewById(R.id.emptyText)
 
         findViewById<View>(R.id.btnOpen).setOnClickListener { picker.launch(MimeSets.ALL) }
+        findViewById<View>(R.id.btnFolder).setOnClickListener { folderPicker.launch(null) }
         findViewById<View>(R.id.btnPdf).setOnClickListener { picker.launch(MimeSets.PDF) }
         findViewById<View>(R.id.btnWord).setOnClickListener { picker.launch(MimeSets.WORD) }
         findViewById<View>(R.id.btnExcel).setOnClickListener { picker.launch(MimeSets.EXCEL) }
@@ -53,6 +101,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refresh()
+        refreshLastFolder()
     }
 
     private fun refresh() {
@@ -100,7 +149,8 @@ class MainActivity : AppCompatActivity() {
             holder.sub.text = "${t.label} · ${DateUtils.getRelativeTimeSpanString(r.time)}"
             holder.itemView.setOnClickListener {
                 try {
-                    FileRouter.open(this@MainActivity, Uri.parse(r.uri))
+                    Playlist.set(items.map { Playlist.Item(Uri.parse(it.uri), it.name) })
+                    FileRouter.open(this@MainActivity, Uri.parse(r.uri), r.name)
                 } catch (e: Exception) {
                     Toast.makeText(this@MainActivity, "File is no longer available", Toast.LENGTH_SHORT).show()
                     Recents.remove(this@MainActivity, r.uri)

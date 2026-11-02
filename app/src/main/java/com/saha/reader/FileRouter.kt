@@ -79,8 +79,8 @@ object FileRouter {
         }
     }
 
-    fun open(ctx: Context, uri: Uri) {
-        val name = displayName(ctx, uri)
+    fun open(ctx: Context, uri: Uri, knownName: String? = null) {
+        val name = knownName ?: displayName(ctx, uri)
         val mime = try { ctx.contentResolver.getType(uri) } catch (_: Exception) { null }
         val type = detect(name, mime)
         val cls = when (type) {

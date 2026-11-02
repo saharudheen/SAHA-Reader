@@ -1,6 +1,5 @@
 package com.saha.reader
 
-import android.app.Dialog
 import android.content.res.Configuration
 import android.graphics.Bitmap
 import android.graphics.Color
@@ -18,7 +17,6 @@ import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.ImageView
 import android.widget.TextView
-import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -36,16 +34,19 @@ class PdfActivity : BaseViewerActivity() {
     private var pageW = IntArray(0)
     private var pageH = IntArray(0)
     private var pageCount = 0
+    private var baseWidth = 1080
     private var renderWidth = 1080
+    private var quality = 1
+    private var generation = 0
 
     @Volatile private var destroyed = false
     @Volatile private var visFirst = 0
     @Volatile private var visLast = 3
 
-    private lateinit var recycler: RecyclerView
+    private lateinit var recycler: ZoomRecyclerView
     private lateinit var pageLabel: TextView
     private val pending = HashSet<Int>()
-    private val cache = object : LruCache<Int, Bitmap>((Runtime.getRuntime().maxMemory() / 6).toInt()) {
+    private val cache = object : LruCache<Int, Bitmap>((Runtime.getRuntime().maxMemory() / 4).toInt()) {
         override fun sizeOf(key: Int, value: Bitmap): Int = value.byteCount
     }
 
@@ -56,8 +57,10 @@ class PdfActivity : BaseViewerActivity() {
         recycler = findViewById(R.id.pdfList)
         pageLabel = findViewById(R.id.pageLabel)
         recycler.layoutManager = LinearLayoutManager(this)
-        renderWidth = min(resources.displayMetrics.widthPixels, 1600)
+        baseWidth = min(resources.displayMetrics.widthPixels, 1440)
+        renderWidth = baseWidth
         pageLabel.setOnClickListener { showGoTo() }
+        recycler.onZoomSettled = { z -> onZoomChanged(z) }
 
         exec.execute {
             try {
@@ -80,6 +83,8 @@ class PdfActivity : BaseViewerActivity() {
             }
         }
     }
+
+    override fun canSwipe(direction: Int): Boolean = !::recycler.isInitialized || !recycler.isZoomed
 
     /** Opens the renderer directly; if the source isn't seekable, copies it to cache first. */
     private fun openRenderer(): PdfRenderer {
@@ -115,13 +120,29 @@ class PdfActivity : BaseViewerActivity() {
             showError("This PDF has no pages.")
             return
         }
-        supportActionBar?.subtitle = "$n page${if (n == 1) "" else "s"}"
+        supportActionBar?.subtitle = "$n page${if (n == 1) "" else "s"} · pinch to zoom"
         recycler.adapter = PageAdapter()
         pageLabel.visibility = View.VISIBLE
         updateLabel()
         recycler.addOnScrollListener(object : RecyclerView.OnScrollListener() {
-            override fun onScrolled(rv: RecyclerView, dx: Int, dy: Int) = updateLabel()
+            override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) = updateLabel()
         })
+    }
+
+    /** Re-render pages at a higher resolution when zoomed in, so text stays sharp. */
+    private fun onZoomChanged(z: Float) {
+        val q = when {
+            z > 2.2f -> 3
+            z > 1.3f -> 2
+            else -> 1
+        }
+        if (q == quality || pageCount == 0) return
+        quality = q
+        renderWidth = min(baseWidth * q, 2400)
+        generation++
+        pending.clear()
+        cache.evictAll()
+        recycler.adapter?.notifyDataSetChanged()
     }
 
     private fun updateLabel() {
@@ -132,7 +153,8 @@ class PdfActivity : BaseViewerActivity() {
             visFirst = first
             visLast = last
         }
-        val shown = (if (lm.findFirstCompletelyVisibleItemPosition() >= 0) lm.findFirstCompletelyVisibleItemPosition() else first).coerceAtLeast(0)
+        val full = lm.findFirstCompletelyVisibleItemPosition()
+        val shown = (if (full >= 0) full else first).coerceAtLeast(0)
         pageLabel.text = "${shown + 1} / $pageCount"
     }
 
@@ -154,10 +176,14 @@ class PdfActivity : BaseViewerActivity() {
 
     private fun requestRender(pos: Int) {
         if (!pending.add(pos)) return
+        val gen = generation
+        val width = renderWidth
         exec.execute {
             val far = pos < visFirst - 2 || pos > visLast + 2
-            val bmp = if (destroyed || far) null else try { renderPage(pos, renderWidth) } catch (_: Throwable) { null }
+            val bmp = if (destroyed || far || gen != generation) null
+            else try { renderPage(pos, width) } catch (_: Throwable) { null }
             ui.post {
+                if (gen != generation) return@post
                 pending.remove(pos)
                 if (bmp != null && !destroyed) {
                     cache.put(pos, bmp)
@@ -169,6 +195,7 @@ class PdfActivity : BaseViewerActivity() {
 
     class PageHolder(v: View) : RecyclerView.ViewHolder(v) {
         val image: ImageView = v.findViewById(R.id.pageImage)
+        var boundPos = -1
     }
 
     inner class PageAdapter : RecyclerView.Adapter<PageHolder>() {
@@ -186,25 +213,11 @@ class PdfActivity : BaseViewerActivity() {
             if (bmp != null) {
                 holder.image.setImageBitmap(bmp)
             } else {
-                holder.image.setImageDrawable(null)
+                // Keep the old (lower-res) picture while the sharper one renders.
+                if (holder.boundPos != position) holder.image.setImageDrawable(null)
                 requestRender(position)
             }
-            holder.itemView.setOnClickListener { openZoom(holder.bindingAdapterPosition) }
-        }
-    }
-
-    /** Full-screen pinch-zoom view of one page, rendered at higher resolution. */
-    private fun openZoom(pos: Int) {
-        if (pos < 0) return
-        val dialog = Dialog(this, android.R.style.Theme_Black_NoTitleBar_Fullscreen)
-        val zv = ZoomImageView(this)
-        dialog.setContentView(zv)
-        dialog.show()
-        Toast.makeText(this, "Page ${pos + 1} · pinch or double-tap to zoom", Toast.LENGTH_SHORT).show()
-        val w = min((renderWidth * 2.2f).toInt(), 2600)
-        exec.execute {
-            val b = if (destroyed) null else try { renderPage(pos, w) } catch (_: Throwable) { null }
-            ui.post { if (b != null && dialog.isShowing) zv.setImageBitmap(b) }
+            holder.boundPos = position
         }
     }
 
@@ -228,7 +241,10 @@ class PdfActivity : BaseViewerActivity() {
 
     override fun onConfigurationChanged(newConfig: Configuration) {
         super.onConfigurationChanged(newConfig)
-        if (::recycler.isInitialized) recycler.post { recycler.adapter?.notifyDataSetChanged() }
+        if (::recycler.isInitialized) recycler.post {
+            recycler.resetZoom()
+            recycler.adapter?.notifyDataSetChanged()
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

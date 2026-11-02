@@ -20,6 +20,7 @@ class ZoomImageView @JvmOverloads constructor(
     private val m = Matrix()
     private var curScale = 1f
     private val maxScale = 8f
+    val isZoomed: Boolean get() = curScale > 1.01f
 
     init {
         scaleType = ScaleType.MATRIX

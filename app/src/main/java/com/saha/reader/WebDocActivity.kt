@@ -23,8 +23,11 @@ class WebDocActivity : BaseViewerActivity() {
         web = findViewById(R.id.webView)
         web.settings.apply {
             javaScriptEnabled = true // only for switching Excel sheet tabs; all file text is escaped
+            setSupportZoom(true)
             builtInZoomControls = true
             displayZoomControls = false
+            useWideViewPort = true
+            loadWithOverviewMode = true
             allowFileAccess = false
             allowContentAccess = false
             textZoom = this@WebDocActivity.textZoom
@@ -52,6 +55,10 @@ class WebDocActivity : BaseViewerActivity() {
             }
         }
     }
+
+    // Swipe to the next file only when the page can't scroll further that way.
+    override fun canSwipe(direction: Int): Boolean =
+        !::web.isInitialized || !web.canScrollHorizontally(direction)
 
     private fun build(): String {
         val input = contentResolver.openInputStream(uri) ?: throw IOException("Cannot read this file")

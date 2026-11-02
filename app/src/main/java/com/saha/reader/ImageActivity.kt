@@ -49,6 +49,8 @@ class ImageActivity : BaseViewerActivity() {
         }
     }
 
+    override fun canSwipe(direction: Int): Boolean = !::zoom.isInitialized || !zoom.isZoomed
+
     private fun applyExif(src: Bitmap): Bitmap {
         val orientation = try {
             contentResolver.openInputStream(uri)?.use {

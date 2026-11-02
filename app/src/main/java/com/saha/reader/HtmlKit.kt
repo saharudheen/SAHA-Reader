@@ -25,23 +25,24 @@ pre{white-space:pre-wrap;word-wrap:break-word;font-family:monospace;font-size:14
 .msg b{display:block;font-size:20px;margin-bottom:12px;color:#202124}
 .note{background:#FFF4E5;color:#7A4B00;padding:8px 12px;border-radius:8px;margin:8px 0;font-size:13px}
 body.grid{padding:0}
-.tabs{height:42px;background:#f1f3f4;white-space:nowrap;overflow-x:auto;border-bottom:1px solid #ccc}
+.tabs{position:sticky;top:0;z-index:5;height:42px;background:#f1f3f4;white-space:nowrap;overflow-x:auto;border-bottom:1px solid #ccc}
 .tabs button{border:0;background:none;padding:0 16px;height:42px;font-size:14px;color:#444}
 .tabs button.on{color:#1D7A45;font-weight:bold;border-bottom:3px solid #1D7A45}
-.sheet{display:none;overflow:auto;height:calc(100vh - 43px)}
-.sheet.solo{height:100vh}
+.sheet{display:none}
 .sheet.on{display:block}
 table.g{border-collapse:separate;border-spacing:0;font-size:13px}
 table.g td{border-right:1px solid #e0e0e0;border-bottom:1px solid #e0e0e0;padding:3px 6px;white-space:nowrap;max-width:340px;overflow:hidden;text-overflow:ellipsis;background:#fff}
 table.g td.n{text-align:right}
-table.g th{background:#f3f3f3;color:#666;font-weight:normal;border-right:1px solid #d0d0d0;border-bottom:1px solid #d0d0d0;padding:3px 6px;position:sticky;top:0;z-index:2}
+table.g th{background:#f3f3f3;color:#666;font-weight:normal;border-right:1px solid #d0d0d0;border-bottom:1px solid #d0d0d0;padding:3px 6px}
+table.g thead th{position:sticky;top:0;z-index:2}
+body.tabbed table.g thead th{top:42px}
 table.g th.r{position:sticky;left:0;z-index:1;text-align:right}
 table.g thead th.r{z-index:3}
 """
 
     fun page(body: String, bodyClass: String = "", script: String = ""): String =
         "<!DOCTYPE html><html><head><meta charset='utf-8'>" +
-            "<meta name='viewport' content='width=device-width, initial-scale=1'>" +
+            "<meta name='viewport' content='width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=6, user-scalable=yes'>" +
             "<style>$BASE_CSS</style></head><body class='$bodyClass'>$body" +
             (if (script.isNotEmpty()) "<script>$script</script>" else "") + "</body></html>"
 

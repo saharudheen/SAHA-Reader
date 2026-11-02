@@ -53,7 +53,7 @@ object CsvParser {
         }
         if (cur.isNotEmpty() || cells.isNotEmpty()) endRow()
 
-        val body = StringBuilder("<div class='sheet solo on'>")
+        val body = StringBuilder("<div class='sheet on'>")
         if (truncated) body.append("<div class='note'>File is large — showing the first part only.</div>")
         if (rows.isEmpty()) body.append("<div class='msg'>This file is empty.</div>")
         else HtmlKit.grid(body, rows, maxCols)
