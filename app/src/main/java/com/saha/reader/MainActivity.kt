@@ -1,11 +1,12 @@
 package com.saha.reader
 
+import android.Manifest
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
-import android.provider.DocumentsContract
-import android.provider.OpenableColumns
+import android.provider.Settings
 import android.text.format.DateUtils
 import android.view.Menu
 import android.view.MenuItem
@@ -34,49 +35,9 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private val folderPicker = registerForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree: Uri? ->
-        if (tree != null) {
-            try {
-                contentResolver.takePersistableUriPermission(tree, Intent.FLAG_GRANT_READ_URI_PERMISSION)
-            } catch (_: Exception) {
-            }
-            val name = folderName(tree)
-            getSharedPreferences("saha_reader", MODE_PRIVATE).edit()
-                .putString("last_tree", tree.toString()).putString("last_tree_name", name).apply()
-            openFolder(tree, name)
-        }
-    }
-
-    private fun openFolder(tree: Uri, name: String) {
-        startActivity(
-            Intent(this, FolderActivity::class.java)
-                .putExtra(FolderActivity.EXTRA_TREE, tree.toString())
-                .putExtra(FolderActivity.EXTRA_TITLE, name)
-        )
-    }
-
-    private fun folderName(tree: Uri): String = try {
-        val doc = DocumentsContract.buildDocumentUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
-        contentResolver.query(doc, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
-            if (c.moveToFirst()) c.getString(0) else null
-        } ?: "Folder"
-    } catch (_: Exception) {
-        "Folder"
-    }
-
-    private fun refreshLastFolder() {
-        val btn = findViewById<TextView>(R.id.btnLastFolder)
-        val prefs = getSharedPreferences("saha_reader", MODE_PRIVATE)
-        val tree = prefs.getString("last_tree", null)?.let { Uri.parse(it) }
-        val stillAllowed = tree != null && contentResolver.persistedUriPermissions.any { it.uri == tree && it.isReadPermission }
-        if (tree == null || !stillAllowed) {
-            btn.visibility = View.GONE
-            return
-        }
-        val name = prefs.getString("last_tree_name", null) ?: "Folder"
-        btn.text = "Continue in “$name” folder  →"
-        btn.visibility = View.VISIBLE
-        btn.setOnClickListener { openFolder(tree, name) }
+    private val storagePermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted: Boolean ->
+        if (!granted) Toast.makeText(this, "Permission not given — swiping works only in Recent files", Toast.LENGTH_LONG).show()
+        refreshAccessBanner()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -85,12 +46,12 @@ class MainActivity : AppCompatActivity() {
         emptyText = findViewById(R.id.emptyText)
 
         findViewById<View>(R.id.btnOpen).setOnClickListener { picker.launch(MimeSets.ALL) }
-        findViewById<View>(R.id.btnFolder).setOnClickListener { folderPicker.launch(null) }
         findViewById<View>(R.id.btnPdf).setOnClickListener { picker.launch(MimeSets.PDF) }
         findViewById<View>(R.id.btnWord).setOnClickListener { picker.launch(MimeSets.WORD) }
         findViewById<View>(R.id.btnExcel).setOnClickListener { picker.launch(MimeSets.EXCEL) }
         findViewById<View>(R.id.btnText).setOnClickListener { picker.launch(MimeSets.TEXT) }
         findViewById<View>(R.id.btnImage).setOnClickListener { picker.launch(MimeSets.IMAGE) }
+        findViewById<View>(R.id.btnAllowSwipe).setOnClickListener { askAccess() }
 
         val list = findViewById<RecyclerView>(R.id.recentList)
         list.layoutManager = LinearLayoutManager(this)
@@ -101,7 +62,7 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         refresh()
-        refreshLastFolder()
+        refreshAccessBanner()
     }
 
     private fun refresh() {
@@ -109,6 +70,37 @@ class MainActivity : AppCompatActivity() {
         items.addAll(Recents.load(this))
         adapter.notifyDataSetChanged()
         emptyText.visibility = if (items.isEmpty()) View.VISIBLE else View.GONE
+    }
+
+    /** Shows the "allow swiping" link until file access is given. */
+    private fun refreshAccessBanner() {
+        findViewById<View>(R.id.btnAllowSwipe).visibility =
+            if (FolderFiles.hasAccess(this)) View.GONE else View.VISIBLE
+    }
+
+    private fun askAccess() {
+        AlertDialog.Builder(this)
+            .setTitle("Swipe between files")
+            .setMessage(
+                "To let you swipe to the next / previous file in the same folder, Saha Reader needs permission to read your files.\n\n" +
+                    "Files are only read on this phone — the app has no internet access." +
+                    (if (Build.VERSION.SDK_INT >= 30) "\n\nOn the next screen, turn on “Allow access to manage all files”." else "")
+            )
+            .setPositiveButton("Allow") { _, _ ->
+                if (Build.VERSION.SDK_INT >= 30) {
+                    try {
+                        startActivity(
+                            Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION, Uri.parse("package:$packageName"))
+                        )
+                    } catch (_: Exception) {
+                        startActivity(Intent(Settings.ACTION_MANAGE_ALL_FILES_ACCESS_PERMISSION))
+                    }
+                } else {
+                    storagePermission.launch(Manifest.permission.READ_EXTERNAL_STORAGE)
+                }
+            }
+            .setNegativeButton("Not now", null)
+            .show()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -149,7 +141,7 @@ class MainActivity : AppCompatActivity() {
             holder.sub.text = "${t.label} · ${DateUtils.getRelativeTimeSpanString(r.time)}"
             holder.itemView.setOnClickListener {
                 try {
-                    Playlist.set(items.map { Playlist.Item(Uri.parse(it.uri), it.name) })
+                    Playlist.set(items.map { Playlist.Item(Uri.parse(it.uri), it.name) }, "Recent files")
                     FileRouter.open(this@MainActivity, Uri.parse(r.uri), r.name)
                 } catch (e: Exception) {
                     Toast.makeText(this@MainActivity, "File is no longer available", Toast.LENGTH_SHORT).show()

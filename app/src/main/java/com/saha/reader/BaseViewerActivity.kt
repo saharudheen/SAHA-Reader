@@ -11,6 +11,8 @@ import android.view.View
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.FileProvider
+import java.io.File
 import kotlin.math.abs
 
 abstract class BaseViewerActivity : AppCompatActivity() {
@@ -23,6 +25,7 @@ abstract class BaseViewerActivity : AppCompatActivity() {
     protected var fileName = ""
     protected var docType = DocType.UNKNOWN
     private var swipe: GestureDetector? = null
+    private var playIndex = -1
 
     /** Call right after setContentView. Returns false if there is nothing to show. */
     protected fun initViewer(): Boolean {
@@ -48,11 +51,26 @@ abstract class BaseViewerActivity : AppCompatActivity() {
     /** Viewers return false when the gesture should pan/zoom the content instead. */
     protected open fun canSwipe(direction: Int): Boolean = true
 
+    /** Uses the current list (recent files / same folder) or builds one from this file's folder. */
+    private fun setupPlaylist() {
+        playIndex = Playlist.indexOf(uri)
+        if (playIndex >= 0 || !FolderFiles.hasAccess(this)) return
+        val file = FolderFiles.fileFor(this, uri, fileName) ?: return
+        val dir = file.parentFile ?: return
+        val files = FolderFiles.list(dir)
+        val idx = files.indexOfFirst { it.absolutePath == file.absolutePath }
+        if (idx < 0 || files.size < 2) return
+        Playlist.set(files.map { Playlist.Item(Uri.fromFile(it), it.name) }, dir.name)
+        playIndex = idx
+    }
+
     private fun setupSwipe() {
-        val index = Playlist.indexOf(uri)
+        setupPlaylist()
+        val index = playIndex
         if (index < 0 || Playlist.size() < 2) return
-        if (hintShown.add(uri)) {
-            Toast.makeText(this, "File ${index + 1} of ${Playlist.size()} · swipe ← → for other files", Toast.LENGTH_SHORT).show()
+        if (!Playlist.hintShown) {
+            Playlist.hintShown = true
+            Toast.makeText(this, "${index + 1} of ${Playlist.size()} in ${Playlist.label} · swipe ← → for other files", Toast.LENGTH_SHORT).show()
         }
         val minDist = 90 * resources.displayMetrics.density
         swipe = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
@@ -79,7 +97,7 @@ abstract class BaseViewerActivity : AppCompatActivity() {
     }
 
     private fun goTo(dir: Int) {
-        val i = Playlist.indexOf(uri)
+        val i = playIndex
         if (i < 0) return
         val next = Playlist.get(i + dir)
         if (next == null) {
@@ -101,7 +119,7 @@ abstract class BaseViewerActivity : AppCompatActivity() {
     // ---------- recent files ----------
 
     private fun rememberRecent() {
-        val persisted = try {
+        val persisted = if (uri.scheme == "file") true else try {
             contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             true
         } catch (_: Exception) {
@@ -139,7 +157,7 @@ abstract class BaseViewerActivity : AppCompatActivity() {
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.menu_common, menu)
-        val inList = ::uri.isInitialized && Playlist.indexOf(uri) >= 0 && Playlist.size() > 1
+        val inList = playIndex >= 0 && Playlist.size() > 1
         menu.findItem(R.id.action_prev)?.isVisible = inList
         menu.findItem(R.id.action_next)?.isVisible = inList
         return true
@@ -154,10 +172,20 @@ abstract class BaseViewerActivity : AppCompatActivity() {
         else -> super.onOptionsItemSelected(item)
     }
 
+    /** file:// links can't be given to other apps, so wrap them in a content:// link. */
+    private fun shareableUri(): Uri {
+        if (uri.scheme != "file") return uri
+        return try {
+            FileProvider.getUriForFile(this, "$packageName.files", File(uri.path ?: ""))
+        } catch (_: Exception) {
+            uri
+        }
+    }
+
     private fun share() {
         val i = Intent(Intent.ACTION_SEND)
             .setType(mime())
-            .putExtra(Intent.EXTRA_STREAM, uri)
+            .putExtra(Intent.EXTRA_STREAM, shareableUri())
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         try {
             startActivity(Intent.createChooser(i, "Share $fileName"))
@@ -168,7 +196,7 @@ abstract class BaseViewerActivity : AppCompatActivity() {
 
     private fun openWith() {
         val i = Intent(Intent.ACTION_VIEW)
-            .setDataAndType(uri, mime())
+            .setDataAndType(shareableUri(), mime())
             .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         try {
             startActivity(Intent.createChooser(i, "Open with"))
@@ -178,5 +206,3 @@ abstract class BaseViewerActivity : AppCompatActivity() {
     }
 }
 
-/** Files whose "File x of y" hint was already shown this session. */
-private val hintShown = HashSet<Uri>()
