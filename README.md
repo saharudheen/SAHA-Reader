@@ -7,7 +7,7 @@ No ads, no internet permission, no third-party libraries — everything is read 
 
 | Type | What you get |
 |---|---|
-| **PDF** | Smooth page scrolling, page counter (tap it to jump), "Go to page", tap any page for full-screen pinch/double-tap zoom |
+| **PDF** | Smooth page scrolling, **pinch-zoom and double-tap zoom** (pages re-render sharp when zoomed), page counter (tap it to jump), "Go to page" |
 | **Word (.docx)** | Headings, bold/italic/underline, bullets, alignment, tables, embedded pictures, Tamil/Unicode text |
 | **Excel (.xlsx)** | One tab per sheet, column letters + row numbers (sticky), dates shown as dd-MM-yyyy, percentages, TRUE/FALSE |
 | **CSV / TSV** | Same spreadsheet grid; handles quotes, commas inside quotes, `;` and tab separators |
@@ -16,6 +16,8 @@ No ads, no internet permission, no third-party libraries — everything is read 
 
 Also:
 - Shows up in **"Open with"** and **"Share"** from File Manager, WhatsApp, Gmail, etc.
+- **Swipe left/right to move to the next/previous file in the same folder** — works for files opened with *Browse files* or from another app's "Open with". Needs a one-time permission (tap the orange link on the home screen). Files opened from *Recent files* swipe through the recent list. (⋮ → Next / Previous file also works.)
+- **Pinch-zoom** in every viewer (PDF, Word, Excel, CSV, text, images).
 - **Recent files** list on the home screen (long-press to remove).
 - **Search inside** Word / Excel / CSV / text files, bigger/smaller text.
 - **Share** or **Open with another app** from every viewer (⋮ menu).
@@ -42,7 +44,10 @@ If a build ever fails, open the failed step in the Actions log and copy the red 
 
 ```
 app/src/main/java/com/saha/reader/
-  MainActivity.kt        Home screen: Browse files, type shortcuts, recent files
+  MainActivity.kt        Home screen: Browse files, type shortcuts, recent files, permission link
+  FolderFiles.kt         Finds the opened file's real folder and its neighbour files
+  Playlist.kt            The set of files you can swipe through
+  ZoomRecyclerView.kt    Pinch-zoomable page list for PDFs
   OpenActivity.kt        Receives "Open with" / "Share" from other apps
   FileRouter.kt          Detects file type and opens the right viewer
   BaseViewerActivity.kt  Common viewer menu (share, open with) + recent-files saving
@@ -56,4 +61,4 @@ app/src/main/java/com/saha/reader/
   HtmlKit.kt / Recents.kt  Helpers
 ```
 
-Package name: `com.saha.reader` · Version 1.0
+Package name: `com.saha.reader` · Version 1.2
